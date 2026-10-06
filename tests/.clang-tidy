@@ -1,0 +1,6 @@
+---
+# Tests inherit the project config. Expected values in tests are literal on purpose
+# (they are worked out by hand), so the magic-number check is switched off here.
+InheritParentConfig: true
+Checks: >
+  -readability-magic-numbers
