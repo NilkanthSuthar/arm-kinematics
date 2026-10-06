@@ -7,7 +7,9 @@
  */
 #pragma once
 
+#include <cstddef>
 #include <optional>
+#include <vector>
 
 namespace arm {
 
@@ -90,6 +92,24 @@ public:
      *         solution breaks a joint limit.
      */
     [[nodiscard]] std::optional<JointAngles> inverse(double x, double y, bool elbow_up) const;
+
+    /**
+     * @brief Plans a straight-line tool path and solves the joint angles along it.
+     *
+     * The segment from @p start to @p end is split into @p steps equal parts, giving
+     * steps + 1 waypoints (both endpoints included). Every waypoint uses the same elbow
+     * configuration, so the arm never flips between solutions halfway.
+     *
+     * @param start Tool tip position at the beginning of the path.
+     * @param end Tool tip position at the end of the path.
+     * @param steps Number of segments to split the line into. Must be at least 1.
+     * @param elbow_up Elbow configuration to use for every waypoint.
+     * @return One JointAngles per waypoint, or std::nullopt if any waypoint is
+     *         unreachable or breaks a joint limit. No partial path is returned.
+     * @throws std::invalid_argument if @p steps is 0.
+     */
+    [[nodiscard]] std::optional<std::vector<JointAngles>> linear_trajectory(
+        Point start, Point end, std::size_t steps, bool elbow_up = true) const;
 
 private:
     double l1_;

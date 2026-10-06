@@ -89,4 +89,29 @@ std::optional<JointAngles> PlanarArm::inverse(double x, double y, bool elbow_up)
     return JointAngles{theta1, theta2};
 }
 
+std::optional<std::vector<JointAngles>> PlanarArm::linear_trajectory(Point start, Point end,
+                                                                     std::size_t steps,
+                                                                     bool elbow_up) const {
+    if (steps == 0) {
+        throw std::invalid_argument("steps must be at least 1");
+    }
+
+    std::vector<JointAngles> path;
+    path.reserve(steps + 1);
+
+    for (std::size_t i = 0; i <= steps; ++i) {
+        // t goes from 0 (start) to 1 (end) in equal increments.
+        const double t = static_cast<double>(i) / static_cast<double>(steps);
+        const double x = start.x + t * (end.x - start.x);
+        const double y = start.y + t * (end.y - start.y);
+
+        const std::optional<JointAngles> angles = inverse(x, y, elbow_up);
+        if (!angles) {
+            return std::nullopt;
+        }
+        path.push_back(*angles);
+    }
+    return path;
+}
+
 }  // namespace arm

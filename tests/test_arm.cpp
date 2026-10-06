@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <stdexcept>
 
@@ -218,6 +219,89 @@ TEST(JointLimits, InverseRejectsSolutionOutsideShoulderLimit) {
     EXPECT_FALSE(arm.inverse(0.0, -1.5, true).has_value());
     EXPECT_FALSE(arm.inverse(0.0, -1.5, false).has_value());
     EXPECT_TRUE(arm.inverse(0.0, 1.5, true).has_value());
+}
+
+// ---------------------------------------------------------------------------
+// Linear trajectory
+// ---------------------------------------------------------------------------
+
+TEST(LinearTrajectory, EndpointsMatchStartAndEnd) {
+    const PlanarArm arm(2.0, 1.0);
+    const Point start{2.5, 0.5};
+    const Point end{1.0, 2.0};
+
+    const auto path = arm.linear_trajectory(start, end, 10);
+    ASSERT_TRUE(path.has_value());
+    ASSERT_EQ(path->size(), 11U);
+
+    expect_point_near(arm.forward(path->front().theta1, path->front().theta2), start);
+    expect_point_near(arm.forward(path->back().theta1, path->back().theta2), end);
+}
+
+TEST(LinearTrajectory, WaypointsAreEvenlySpacedOnTheLine) {
+    const PlanarArm arm(2.0, 1.0);
+    const Point start{2.0, -1.0};
+    const Point end{2.0, 1.0};
+
+    const auto path = arm.linear_trajectory(start, end, 4, false);
+    ASSERT_TRUE(path.has_value());
+    ASSERT_EQ(path->size(), 5U);
+
+    // Vertical line x = 2 from y = -1 to y = 1 in steps of 0.5.
+    for (std::size_t i = 0; i < path->size(); ++i) {
+        const Point tip = arm.forward((*path)[i].theta1, (*path)[i].theta2);
+        expect_point_near(tip, {2.0, -1.0 + 0.5 * static_cast<double>(i)});
+    }
+}
+
+TEST(LinearTrajectory, KeepsTheSameElbowConfiguration) {
+    const PlanarArm arm(2.0, 1.0);
+
+    const auto up = arm.linear_trajectory({2.5, 0.5}, {1.0, 2.0}, 5, true);
+    const auto down = arm.linear_trajectory({2.5, 0.5}, {1.0, 2.0}, 5, false);
+    ASSERT_TRUE(up.has_value());
+    ASSERT_TRUE(down.has_value());
+
+    for (const auto& angles : *up) {
+        EXPECT_LE(angles.theta2, 0.0);
+    }
+    for (const auto& angles : *down) {
+        EXPECT_GE(angles.theta2, 0.0);
+    }
+}
+
+TEST(LinearTrajectory, SingleStepReturnsJustTheEndpoints) {
+    const PlanarArm arm(1.0, 1.0);
+    const auto path = arm.linear_trajectory({1.0, 1.0}, {1.5, 0.0}, 1);
+    ASSERT_TRUE(path.has_value());
+    EXPECT_EQ(path->size(), 2U);
+}
+
+TEST(LinearTrajectory, ZeroStepsIsAnError) {
+    const PlanarArm arm(1.0, 1.0);
+    EXPECT_THROW((void)arm.linear_trajectory({1.0, 0.0}, {0.0, 1.0}, 0), std::invalid_argument);
+}
+
+TEST(LinearTrajectory, FailsWhenAnEndpointIsUnreachable) {
+    const PlanarArm arm(2.0, 1.0);
+    EXPECT_FALSE(arm.linear_trajectory({2.0, 0.0}, {5.0, 0.0}, 10).has_value());
+    EXPECT_FALSE(arm.linear_trajectory({5.0, 0.0}, {2.0, 0.0}, 10).has_value());
+}
+
+TEST(LinearTrajectory, FailsWhenTheLinePassesThroughTheInnerHole) {
+    // Both endpoints are reachable, but the straight line goes through the base,
+    // which is inside the unreachable inner circle of radius |l1 - l2| = 1.
+    const PlanarArm arm(2.0, 1.0);
+    ASSERT_TRUE(arm.inverse(2.0, 0.0, true).has_value());
+    ASSERT_TRUE(arm.inverse(-2.0, 0.0, true).has_value());
+    EXPECT_FALSE(arm.linear_trajectory({2.0, 0.0}, {-2.0, 0.0}, 10).has_value());
+}
+
+TEST(LinearTrajectory, FailsWhenAWaypointBreaksAJointLimit) {
+    // Shoulder limited to [-0.5, 0.5]: the end of the path needs a larger shoulder angle.
+    const PlanarArm arm(2.0, 1.0, JointLimit{-0.5, 0.5}, JointLimit{});
+    ASSERT_TRUE(arm.inverse(2.5, 0.0, true).has_value());
+    EXPECT_FALSE(arm.linear_trajectory({2.5, 0.0}, {0.0, 2.5}, 10).has_value());
 }
 
 }  // namespace
