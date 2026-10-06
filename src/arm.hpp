@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <optional>
+
 namespace arm {
 
 /// Value of pi used throughout the library.
@@ -44,6 +46,22 @@ public:
      * @return The (x, y) position of the tool tip.
      */
     [[nodiscard]] Point forward(double theta1, double theta2) const;
+
+    /**
+     * @brief Finds joint angles that put the tool tip at (x, y).
+     *
+     * Most reachable points have two solutions. With @p elbow_up the elbow sits on the
+     * counter-clockwise side of the line from the base to the target (above it for a
+     * target on the +x axis), which means theta2 <= 0. Otherwise theta2 >= 0.
+     * At full extension or full fold both solutions are the same.
+     *
+     * @param x Target x position.
+     * @param y Target y position.
+     * @param elbow_up Which of the two solutions to return.
+     * @return The joint angles, with theta1 in [-pi, pi] and theta2 in [-pi, pi],
+     *         or std::nullopt if the target is out of reach.
+     */
+    [[nodiscard]] std::optional<JointAngles> inverse(double x, double y, bool elbow_up) const;
 
 private:
     double l1_;

@@ -1,6 +1,12 @@
 ---
-# Tests inherit the project config. Expected values in tests are literal on purpose
-# (they are worked out by hand), so the magic-number check is switched off here.
+# Tests inherit the project config, with three checks switched off:
+#   - readability-magic-numbers: expected values are worked out by hand and are clearer inline.
+#   - bugprone-unchecked-optional-access: the checker does not understand that
+#     ASSERT_TRUE(opt.has_value()) returns from the test, so every later opt-> is flagged.
+#   - readability-function-cognitive-complexity: GoogleTest macros expand into hidden
+#     if/else/switch blocks, which inflates the score of short, simple tests.
 InheritParentConfig: true
 Checks: >
-  -readability-magic-numbers
+  -readability-magic-numbers,
+  -bugprone-unchecked-optional-access,
+  -readability-function-cognitive-complexity
