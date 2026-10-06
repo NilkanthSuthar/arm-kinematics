@@ -1,0 +1,19 @@
+---
+# Enabled check groups: modernize, bugprone and readability.
+# A few checks are switched off because they fight the domain naming:
+#   - modernize-use-trailing-return-type: style preference, `auto f() -> T` everywhere hurts readability.
+#   - readability-identifier-length: x, y, l1, l2 are the standard names in kinematics.
+#   - bugprone-easily-swappable-parameters: (theta1, theta2) and (x, y) pairs are unavoidable here.
+Checks: >
+  -*,
+  bugprone-*,
+  modernize-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*/src/.*'
+CheckOptions:
+  - key: readability-magic-numbers.IgnoredFloatingPointValues
+    value: '0.5;1.0;2.0;100.0'

@@ -1,0 +1,15 @@
+# Build output
+build/
+cmake-build-*/
+out/
+
+# Coverage reports
+*.gcda
+*.gcno
+*.info
+coverage/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
