@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format clang-tidy lcov
+
+      - name: Check formatting
+        run: clang-format --dry-run --Werror src/*.hpp src/*.cpp tests/*.cpp
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DARM_ENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Run clang-tidy
+        run: clang-tidy -p build --quiet src/arm.cpp tests/test_arm.cpp
+
+      # Only the library sources under src/ count towards coverage (not tests or GoogleTest).
+      # "mismatch" is listed twice so lcov also hides the warning text for it.
+      - name: Generate coverage report
+        run: |
+          lcov --capture --directory build --include "${GITHUB_WORKSPACE}/src/*" \
+               --output-file coverage.info --ignore-errors mismatch,mismatch
+
+      - name: Print coverage total
+        run: |
+          lcov --summary coverage.info
+          {
+            echo '### Coverage'
+            echo '```'
+            lcov --summary coverage.info 2>&1 | grep -E 'lines|functions'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-info
+          path: coverage.info
