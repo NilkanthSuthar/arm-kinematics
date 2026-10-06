@@ -1,0 +1,14 @@
+# Minimal Doxygen config. Run `doxygen` from the repository root;
+# HTML output goes to docs/html/.
+PROJECT_NAME           = "arm-kinematics"
+PROJECT_BRIEF          = "Kinematics for a 2-link planar robot arm"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = src
+FILE_PATTERNS          = *.hpp
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = NO
+EXTRACT_ALL            = NO
+WARN_IF_UNDOCUMENTED   = YES
+WARN_AS_ERROR          = YES
+QUIET                  = YES
