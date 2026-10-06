@@ -26,24 +26,51 @@ struct JointAngles {
     double theta2 = 0.0;  ///< Elbow angle in radians, measured from the first link.
 };
 
+/// Inclusive range of allowed angles for one joint, in radians.
+struct JointLimit {
+    double min = -kPi;  ///< Smallest allowed angle.
+    double max = kPi;   ///< Largest allowed angle.
+};
+
 /**
  * @brief A 2-link planar arm (shoulder joint at the origin, elbow joint, tool tip).
  */
 class PlanarArm {
 public:
     /**
-     * @brief Creates an arm with the given link lengths.
+     * @brief Creates an arm with the given link lengths and joint limits.
      * @param l1 Length of the first link (shoulder to elbow). Must be positive.
      * @param l2 Length of the second link (elbow to tool tip). Must be positive.
-     * @throws std::invalid_argument if a length is zero, negative or not finite.
+     * @param shoulder_limit Allowed range for theta1. Defaults to [-pi, pi].
+     * @param elbow_limit Allowed range for theta2. Defaults to [-pi, pi].
+     * @throws std::invalid_argument if a length is zero, negative or not finite,
+     *         or if a limit has min greater than max.
      */
-    PlanarArm(double l1, double l2);
+    PlanarArm(double l1, double l2, JointLimit shoulder_limit = {}, JointLimit elbow_limit = {});
+
+    /**
+     * @brief Replaces the joint limits.
+     * @param shoulder_limit Allowed range for theta1.
+     * @param elbow_limit Allowed range for theta2.
+     * @throws std::invalid_argument if a limit has min greater than max.
+     *         The old limits are kept in that case.
+     */
+    void set_joint_limits(JointLimit shoulder_limit, JointLimit elbow_limit);
+
+    /**
+     * @brief Checks whether both angles are inside the configured joint limits.
+     * @param theta1 Shoulder angle in radians.
+     * @param theta2 Elbow angle in radians.
+     * @return true if both angles are within their limits (limits are inclusive).
+     */
+    [[nodiscard]] bool within_limits(double theta1, double theta2) const;
 
     /**
      * @brief Computes the tool tip position for the given joint angles.
      * @param theta1 Shoulder angle in radians.
      * @param theta2 Elbow angle in radians.
      * @return The (x, y) position of the tool tip.
+     * @throws std::out_of_range if an angle is outside its joint limit.
      */
     [[nodiscard]] Point forward(double theta1, double theta2) const;
 
@@ -59,13 +86,16 @@ public:
      * @param y Target y position.
      * @param elbow_up Which of the two solutions to return.
      * @return The joint angles, with theta1 in [-pi, pi] and theta2 in [-pi, pi],
-     *         or std::nullopt if the target is out of reach.
+     *         or std::nullopt if the target is out of reach or the requested
+     *         solution breaks a joint limit.
      */
     [[nodiscard]] std::optional<JointAngles> inverse(double x, double y, bool elbow_up) const;
 
 private:
     double l1_;
     double l2_;
+    JointLimit shoulder_limit_;
+    JointLimit elbow_limit_;
 };
 
 }  // namespace arm

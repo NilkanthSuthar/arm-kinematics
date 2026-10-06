@@ -21,15 +21,42 @@ double normalize_angle(double angle) {
     return std::remainder(angle, 2.0 * kPi);
 }
 
-}  // namespace
-
-PlanarArm::PlanarArm(double l1, double l2) : l1_(l1), l2_(l2) {
-    if (!is_valid_length(l1) || !is_valid_length(l2)) {
-        throw std::invalid_argument("link lengths must be positive and finite");
+void check_limit(const JointLimit& limit) {
+    if (limit.min > limit.max) {
+        throw std::invalid_argument("joint limit min must not be greater than max");
     }
 }
 
+bool is_in_range(double angle, const JointLimit& limit) {
+    return angle >= limit.min && angle <= limit.max;
+}
+
+}  // namespace
+
+PlanarArm::PlanarArm(double l1, double l2, JointLimit shoulder_limit, JointLimit elbow_limit)
+    : l1_(l1), l2_(l2) {
+    if (!is_valid_length(l1) || !is_valid_length(l2)) {
+        throw std::invalid_argument("link lengths must be positive and finite");
+    }
+    set_joint_limits(shoulder_limit, elbow_limit);
+}
+
+void PlanarArm::set_joint_limits(JointLimit shoulder_limit, JointLimit elbow_limit) {
+    // Validate both before changing anything, so a bad call leaves the arm untouched.
+    check_limit(shoulder_limit);
+    check_limit(elbow_limit);
+    shoulder_limit_ = shoulder_limit;
+    elbow_limit_ = elbow_limit;
+}
+
+bool PlanarArm::within_limits(double theta1, double theta2) const {
+    return is_in_range(theta1, shoulder_limit_) && is_in_range(theta2, elbow_limit_);
+}
+
 Point PlanarArm::forward(double theta1, double theta2) const {
+    if (!within_limits(theta1, theta2)) {
+        throw std::out_of_range("joint angles are outside the configured limits");
+    }
     const double x = l1_ * std::cos(theta1) + l2_ * std::cos(theta1 + theta2);
     const double y = l1_ * std::sin(theta1) + l2_ * std::sin(theta1 + theta2);
     return {x, y};
@@ -56,6 +83,9 @@ std::optional<JointAngles> PlanarArm::inverse(double x, double y, bool elbow_up)
     const double theta1 =
         normalize_angle(std::atan2(y, x) - std::atan2(l2_ * sin_theta2, l1_ + l2_ * cos_theta2));
 
+    if (!within_limits(theta1, theta2)) {
+        return std::nullopt;
+    }
     return JointAngles{theta1, theta2};
 }
 

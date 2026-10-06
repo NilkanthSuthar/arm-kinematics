@@ -9,6 +9,7 @@
 
 namespace {
 
+using arm::JointLimit;
 using arm::kPi;
 using arm::PlanarArm;
 using arm::Point;
@@ -164,6 +165,59 @@ TEST(Inverse, FullyFoldedArmIsReachable) {
     ASSERT_TRUE(solution.has_value());
     EXPECT_NEAR(std::abs(solution->theta2), kPi, kTolerance);
     expect_point_near(arm.forward(solution->theta1, solution->theta2), {1.0, 0.0});
+}
+
+// ---------------------------------------------------------------------------
+// Joint limits
+// ---------------------------------------------------------------------------
+
+TEST(JointLimits, DefaultLimitsAreMinusPiToPi) {
+    const PlanarArm arm(1.0, 1.0);
+    EXPECT_TRUE(arm.within_limits(kPi, -kPi));
+    EXPECT_FALSE(arm.within_limits(kPi + 0.01, 0.0));
+    EXPECT_FALSE(arm.within_limits(0.0, -kPi - 0.01));
+}
+
+TEST(JointLimits, ConstructorRejectsInvertedLimit) {
+    EXPECT_THROW(PlanarArm(1.0, 1.0, JointLimit{1.0, -1.0}), std::invalid_argument);
+    EXPECT_THROW(PlanarArm(1.0, 1.0, JointLimit{}, JointLimit{0.5, 0.0}), std::invalid_argument);
+}
+
+TEST(JointLimits, SetterReplacesLimits) {
+    PlanarArm arm(1.0, 1.0);
+    arm.set_joint_limits({-0.5, 0.5}, {0.0, 1.0});
+    EXPECT_TRUE(arm.within_limits(0.5, 0.0));
+    EXPECT_FALSE(arm.within_limits(0.6, 0.0));
+    EXPECT_FALSE(arm.within_limits(0.0, -0.1));
+}
+
+TEST(JointLimits, SetterRejectsInvertedLimitAndKeepsOldOnes) {
+    PlanarArm arm(1.0, 1.0, {-0.5, 0.5}, {-0.5, 0.5});
+    EXPECT_THROW(arm.set_joint_limits({-1.0, 1.0}, {1.0, -1.0}), std::invalid_argument);
+    // The shoulder limit must not have been widened to [-1, 1].
+    EXPECT_FALSE(arm.within_limits(0.8, 0.0));
+}
+
+TEST(JointLimits, ForwardRejectsAnglesOutsideLimits) {
+    const PlanarArm arm(1.0, 1.0, {-1.0, 1.0}, {0.0, 2.0});
+    EXPECT_NO_THROW((void)arm.forward(1.0, 2.0));
+    EXPECT_THROW((void)arm.forward(1.5, 1.0), std::out_of_range);
+    EXPECT_THROW((void)arm.forward(0.0, -0.5), std::out_of_range);
+}
+
+TEST(JointLimits, InverseRejectsSolutionOutsideElbowLimit) {
+    // The elbow can only bend one way, so only the elbow-down (theta2 >= 0) solution exists.
+    const PlanarArm arm(1.0, 1.0, JointLimit{}, JointLimit{0.0, kPi});
+    EXPECT_FALSE(arm.inverse(1.0, 1.0, true).has_value());
+    EXPECT_TRUE(arm.inverse(1.0, 1.0, false).has_value());
+}
+
+TEST(JointLimits, InverseRejectsSolutionOutsideShoulderLimit) {
+    // Shoulder restricted to the upper half plane: a target straight below is out.
+    const PlanarArm arm(1.0, 1.0, JointLimit{0.0, kPi}, JointLimit{});
+    EXPECT_FALSE(arm.inverse(0.0, -1.5, true).has_value());
+    EXPECT_FALSE(arm.inverse(0.0, -1.5, false).has_value());
+    EXPECT_TRUE(arm.inverse(0.0, 1.5, true).has_value());
 }
 
 }  // namespace
